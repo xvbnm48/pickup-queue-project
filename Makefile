@@ -1,5 +1,5 @@
 # Pickup Queue Project Makefile
-.PHONY: help setup clean build run test docker-up docker-down docker-logs
+.PHONY: help setup clean build run test docker-up docker-down docker-logs compose-up compose-down compose-build compose-logs compose-clean compose-restart
 
 # Default target
 help: ## Show this help message
@@ -291,4 +291,55 @@ info: ## Show environment information
 	@echo "URLs:"
 	@echo "  API: http://localhost:8080"
 	@echo "  API Health: http://localhost:8080/health"
-	@echo "  Frontend: http://localhost:5173"
+	@echo "  Frontend: http://localhost:3000"
+
+# =============================================================================
+# DOCKER COMPOSE COMMANDS
+# =============================================================================
+
+.PHONY: compose-up compose-down compose-build compose-logs compose-clean compose-restart
+
+compose-build: ## Build all Docker Compose services
+	@echo "🐳 Building all Docker Compose services..."
+	docker compose build
+
+compose-up: ## Start all services with Docker Compose (API + DB + Frontend + Worker)
+	@echo "🚀 Starting all services with Docker Compose..."
+	docker compose up -d
+	@echo "✅ All services started!"
+	@echo ""
+	@echo "🌐 Frontend: http://localhost:3000"
+	@echo "🔌 API: http://localhost:8080"
+	@echo "🗄️  Database: localhost:5432"
+	@echo "📊 API Health: http://localhost:8080/health"
+
+compose-down: ## Stop all Docker Compose services
+	@echo "🛑 Stopping all Docker Compose services..."
+	docker compose down
+
+compose-logs: ## View logs from all Docker Compose services
+	docker compose logs -f
+
+compose-clean: ## Clean up all Docker Compose resources
+	@echo "🧹 Cleaning up all Docker Compose resources..."
+	docker compose down -v --rmi all
+	docker system prune -f
+
+compose-restart: compose-down compose-up ## Restart all Docker Compose services
+
+compose-status: ## Check status of all services
+	docker compose ps
+
+# Start only specific services
+compose-db: ## Start only database service
+	docker compose up -d postgres
+
+compose-backend: ## Start only backend services (database + API + worker)
+	docker compose up -d postgres backend worker
+
+# Database access via Docker Compose
+compose-db-shell: ## Access PostgreSQL shell via Docker Compose
+	docker compose exec postgres psql -U postgres -d pickup_queue
+
+compose-db-migrate: ## Run database migrations via Docker Compose
+	docker compose exec postgres psql -U postgres -d pickup_queue -f /docker-entrypoint-initdb.d/001_create_packages_table.sql

@@ -2,6 +2,50 @@
 
 A full-stack application for managing package pickup queues with real-time status tracking.
 
+## 🚀 Quick Start with Docker Compose
+
+The easiest way to run the entire application (API + Database + Frontend + Worker) is using Docker Compose:
+
+### Prerequisites
+- Docker and Docker Compose installed
+- Make (optional, for shortcuts)
+
+### Start All Services
+```bash
+# Using Docker Compose directly
+docker compose up -d
+
+# Or using Make
+make compose-up
+```
+
+This will start:
+- 📊 **Frontend**: http://localhost:3000 (Next.js React app)
+- 🔌 **Backend API**: http://localhost:8080 (Go REST API)
+- 🗄️ **PostgreSQL Database**: localhost:5432
+- ⚙️ **Background Worker**: (Package expiry automation)
+
+### Other Docker Compose Commands
+```bash
+# Build all images
+make compose-build
+
+# View logs
+make compose-logs
+
+# Stop all services
+make compose-down
+
+# Clean up everything
+make compose-clean
+
+# Restart all services
+make compose-restart
+
+# Check service status
+make compose-status
+```
+
 ## 🏗️ Architecture
 
 This project follows clean architecture principles with:
