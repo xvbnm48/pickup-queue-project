@@ -31,11 +31,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Auto migrate
-	if err := database.AutoMigrate(db); err != nil {
-		appLogger.Error("Failed to migrate database:", err)
-		os.Exit(1)
-	}
+	// Note: Database migrations should be handled separately with migration files
 
 	// Initialize repositories
 	packageRepo := repository.NewPackageRepository(db)

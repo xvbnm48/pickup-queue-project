@@ -1,126 +1,408 @@
 package repository
 
 import (
+	"database/sql"
+	"fmt"
 	"pickup-queue/internal/domain"
+	"pickup-queue/pkg/database"
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type PackageRepository struct {
-	db *gorm.DB
+	db *sql.DB
 }
 
-func NewPackageRepository(db *gorm.DB) domain.PackageRepository {
+func NewPackageRepository(db *sql.DB) domain.PackageRepository {
 	return &PackageRepository{db: db}
 }
 
 func (pr *PackageRepository) Create(pkg *domain.Package) error {
-	return pr.db.Create(pkg).Error
+	query := `
+		INSERT INTO packages (id, order_ref, driver_code, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)`
+
+	args := []interface{}{
+		pkg.ID,
+		pkg.OrderRef,
+		pkg.DriverCode,
+		pkg.Status,
+		pkg.CreatedAt,
+		pkg.UpdatedAt,
+	}
+
+	startTime := time.Now()
+	_, err := pr.db.Exec(query, args...)
+
+	if err != nil {
+		database.LogQueryError(query, args, err, startTime)
+	} else {
+		database.LogQuery(query, args, startTime)
+	}
+
+	return err
 }
 
 func (pr *PackageRepository) GetByID(id uuid.UUID) (*domain.Package, error) {
+	query := `
+		SELECT id, order_ref, driver_code, status, created_at, updated_at, 
+		       picked_up_at, handed_over_at, expired_at
+		FROM packages 
+		WHERE id = $1`
+
+	args := []interface{}{id}
+	startTime := time.Now()
+
 	var pkg domain.Package
-	err := pr.db.Where("id = ?", id).First(&pkg).Error
+	var pickedUpAt, handedOverAt, expiredAt sql.NullTime
+
+	err := pr.db.QueryRow(query, id).Scan(
+		&pkg.ID,
+		&pkg.OrderRef,
+		&pkg.DriverCode,
+		&pkg.Status,
+		&pkg.CreatedAt,
+		&pkg.UpdatedAt,
+		&pickedUpAt,
+		&handedOverAt,
+		&expiredAt,
+	)
+
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if err == sql.ErrNoRows {
+			database.LogQuery(query, args, startTime)
 			return nil, nil
 		}
+		database.LogQueryError(query, args, err, startTime)
 		return nil, err
 	}
+
+	database.LogQuery(query, args, startTime)
+
+	// Handle nullable time fields
+	if pickedUpAt.Valid {
+		pkg.PickedUpAt = &pickedUpAt.Time
+	}
+	if handedOverAt.Valid {
+		pkg.HandedOverAt = &handedOverAt.Time
+	}
+	if expiredAt.Valid {
+		pkg.ExpiredAt = &expiredAt.Time
+	}
+
 	return &pkg, nil
 }
 
 func (pr *PackageRepository) GetByOrderRef(orderRef string) (*domain.Package, error) {
+	query := `
+		SELECT id, order_ref, driver_code, status, created_at, updated_at, 
+		       picked_up_at, handed_over_at, expired_at
+		FROM packages 
+		WHERE order_ref = $1`
+
+	args := []interface{}{orderRef}
+	startTime := time.Now()
+
 	var pkg domain.Package
-	err := pr.db.Where("order_ref = ?", orderRef).First(&pkg).Error
+	var pickedUpAt, handedOverAt, expiredAt sql.NullTime
+
+	err := pr.db.QueryRow(query, orderRef).Scan(
+		&pkg.ID,
+		&pkg.OrderRef,
+		&pkg.DriverCode,
+		&pkg.Status,
+		&pkg.CreatedAt,
+		&pkg.UpdatedAt,
+		&pickedUpAt,
+		&handedOverAt,
+		&expiredAt,
+	)
+
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if err == sql.ErrNoRows {
+			database.LogQuery(query, args, startTime)
 			return nil, nil
 		}
+		database.LogQueryError(query, args, err, startTime)
 		return nil, err
 	}
+
+	database.LogQuery(query, args, startTime)
+
+	// Handle nullable time fields
+	if pickedUpAt.Valid {
+		pkg.PickedUpAt = &pickedUpAt.Time
+	}
+	if handedOverAt.Valid {
+		pkg.HandedOverAt = &handedOverAt.Time
+	}
+	if expiredAt.Valid {
+		pkg.ExpiredAt = &expiredAt.Time
+	}
+
 	return &pkg, nil
 }
 
 func (pr *PackageRepository) GetAll(limit, offset int, status *domain.PackageStatus) ([]*domain.Package, error) {
-	var packages []*domain.Package
-	query := pr.db.Limit(limit).Offset(offset).Order("created_at DESC")
+	baseQuery := `
+		SELECT id, order_ref, driver_code, status, created_at, updated_at, 
+		       picked_up_at, handed_over_at, expired_at
+		FROM packages`
+
+	var args []interface{}
+	var whereClause string
+	argIndex := 1
 
 	if status != nil {
-		query = query.Where("status = ?", *status)
+		whereClause = " WHERE status = $" + fmt.Sprintf("%d", argIndex)
+		args = append(args, *status)
+		argIndex++
 	}
 
-	err := query.Find(&packages).Error
-	return packages, err
+	query := baseQuery + whereClause +
+		" ORDER BY created_at DESC" +
+		" LIMIT $" + fmt.Sprintf("%d", argIndex) +
+		" OFFSET $" + fmt.Sprintf("%d", argIndex+1)
+
+	args = append(args, limit, offset)
+
+	startTime := time.Now()
+	rows, err := pr.db.Query(query, args...)
+	if err != nil {
+		database.LogQueryError(query, args, err, startTime)
+		return nil, err
+	}
+	defer rows.Close()
+
+	database.LogQuery(query, args, startTime)
+
+	var packages []*domain.Package
+	for rows.Next() {
+		var pkg domain.Package
+		var pickedUpAt, handedOverAt, expiredAt sql.NullTime
+
+		err := rows.Scan(
+			&pkg.ID,
+			&pkg.OrderRef,
+			&pkg.DriverCode,
+			&pkg.Status,
+			&pkg.CreatedAt,
+			&pkg.UpdatedAt,
+			&pickedUpAt,
+			&handedOverAt,
+			&expiredAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Handle nullable time fields
+		if pickedUpAt.Valid {
+			pkg.PickedUpAt = &pickedUpAt.Time
+		}
+		if handedOverAt.Valid {
+			pkg.HandedOverAt = &handedOverAt.Time
+		}
+		if expiredAt.Valid {
+			pkg.ExpiredAt = &expiredAt.Time
+		}
+
+		packages = append(packages, &pkg)
+	}
+
+	return packages, rows.Err()
 }
 
 func (pr *PackageRepository) Update(pkg *domain.Package) error {
-	return pr.db.Save(pkg).Error
+	query := `
+		UPDATE packages 
+		SET order_ref = $2, driver_code = $3, status = $4, updated_at = $5,
+		    picked_up_at = $6, handed_over_at = $7, expired_at = $8
+		WHERE id = $1`
+
+	args := []interface{}{
+		pkg.ID,
+		pkg.OrderRef,
+		pkg.DriverCode,
+		pkg.Status,
+		pkg.UpdatedAt,
+		pkg.PickedUpAt,
+		pkg.HandedOverAt,
+		pkg.ExpiredAt,
+	}
+
+	startTime := time.Now()
+	_, err := pr.db.Exec(query, args...)
+
+	if err != nil {
+		database.LogQueryError(query, args, err, startTime)
+	} else {
+		database.LogQuery(query, args, startTime)
+	}
+
+	return err
 }
 
 func (pr *PackageRepository) Delete(id uuid.UUID) error {
-	return pr.db.Delete(&domain.Package{}, "id = ?", id).Error
+	query := `DELETE FROM packages WHERE id = $1`
+	args := []interface{}{id}
+
+	startTime := time.Now()
+	_, err := pr.db.Exec(query, id)
+
+	if err != nil {
+		database.LogQueryError(query, args, err, startTime)
+	} else {
+		database.LogQuery(query, args, startTime)
+	}
+
+	return err
 }
 
 func (pr *PackageRepository) GetExpiredPackages() ([]*domain.Package, error) {
-	var packages []*domain.Package
 	// Packages that have been waiting for more than 24 hours are considered expired
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 
-	err := pr.db.Where("status = ? AND created_at < ?", domain.StatusWaiting, cutoffTime).Find(&packages).Error
-	return packages, err
+	query := `
+		SELECT id, order_ref, driver_code, status, created_at, updated_at, 
+		       picked_up_at, handed_over_at, expired_at
+		FROM packages 
+		WHERE status IN ($1, $2) AND created_at < $3`
+
+	args := []interface{}{domain.StatusWaiting, domain.StatusPicked, cutoffTime}
+	startTime := time.Now()
+
+	rows, err := pr.db.Query(query, domain.StatusWaiting, domain.StatusPicked, cutoffTime)
+	if err != nil {
+		database.LogQueryError(query, args, err, startTime)
+		return nil, err
+	}
+	defer rows.Close()
+
+	database.LogQuery(query, args, startTime)
+
+	var packages []*domain.Package
+	for rows.Next() {
+		var pkg domain.Package
+		var pickedUpAt, handedOverAt, expiredAt sql.NullTime
+
+		err := rows.Scan(
+			&pkg.ID,
+			&pkg.OrderRef,
+			&pkg.DriverCode,
+			&pkg.Status,
+			&pkg.CreatedAt,
+			&pkg.UpdatedAt,
+			&pickedUpAt,
+			&handedOverAt,
+			&expiredAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Handle nullable time fields
+		if pickedUpAt.Valid {
+			pkg.PickedUpAt = &pickedUpAt.Time
+		}
+		if handedOverAt.Valid {
+			pkg.HandedOverAt = &handedOverAt.Time
+		}
+		if expiredAt.Valid {
+			pkg.ExpiredAt = &expiredAt.Time
+		}
+
+		packages = append(packages, &pkg)
+	}
+
+	return packages, rows.Err()
 }
 
 func (pr *PackageRepository) UpdateStatus(id uuid.UUID, status domain.PackageStatus) error {
 	now := time.Now()
-	updates := map[string]interface{}{
-		"status":     status,
-		"updated_at": now,
-	}
+
+	var query string
+	var args []interface{}
 
 	switch status {
 	case domain.StatusPicked:
-		updates["picked_up_at"] = now
+		query = `UPDATE packages SET status = $2, updated_at = $3, picked_up_at = $3 WHERE id = $1`
+		args = []interface{}{id, status, now}
 	case domain.StatusHandedOver:
-		updates["handed_over_at"] = now
+		query = `UPDATE packages SET status = $2, updated_at = $3, handed_over_at = $3 WHERE id = $1`
+		args = []interface{}{id, status, now}
 	case domain.StatusExpired:
-		updates["expired_at"] = now
+		query = `UPDATE packages SET status = $2, updated_at = $3, expired_at = $3 WHERE id = $1`
+		args = []interface{}{id, status, now}
+	default:
+		query = `UPDATE packages SET status = $2, updated_at = $3 WHERE id = $1`
+		args = []interface{}{id, status, now}
 	}
 
-	return pr.db.Model(&domain.Package{}).Where("id = ?", id).Updates(updates).Error
+	startTime := time.Now()
+	_, err := pr.db.Exec(query, args...)
+
+	if err != nil {
+		database.LogQueryError(query, args, err, startTime)
+	} else {
+		database.LogQuery(query, args, startTime)
+	}
+
+	return err
 }
 
 func (pr *PackageRepository) GetPackageStats() (*domain.PackageStats, error) {
 	var stats domain.PackageStats
 
 	// Get total count
-	err := pr.db.Model(&domain.Package{}).Count(&stats.Total).Error
+	query1 := "SELECT COUNT(*) FROM packages"
+	args1 := []interface{}{}
+	startTime1 := time.Now()
+	err := pr.db.QueryRow(query1).Scan(&stats.Total)
 	if err != nil {
+		database.LogQueryError(query1, args1, err, startTime1)
 		return nil, err
 	}
+	database.LogQuery(query1, args1, startTime1)
 
 	// Get counts by status
-	err = pr.db.Model(&domain.Package{}).Where("status = ?", domain.StatusWaiting).Count(&stats.Waiting).Error
+	query2 := "SELECT COUNT(*) FROM packages WHERE status = $1"
+	args2 := []interface{}{domain.StatusWaiting}
+	startTime2 := time.Now()
+	err = pr.db.QueryRow(query2, domain.StatusWaiting).Scan(&stats.Waiting)
 	if err != nil {
+		database.LogQueryError(query2, args2, err, startTime2)
 		return nil, err
 	}
+	database.LogQuery(query2, args2, startTime2)
 
-	err = pr.db.Model(&domain.Package{}).Where("status = ?", domain.StatusPicked).Count(&stats.Picked).Error
+	args3 := []interface{}{domain.StatusPicked}
+	startTime3 := time.Now()
+	err = pr.db.QueryRow(query2, domain.StatusPicked).Scan(&stats.Picked)
 	if err != nil {
+		database.LogQueryError(query2, args3, err, startTime3)
 		return nil, err
 	}
+	database.LogQuery(query2, args3, startTime3)
 
-	err = pr.db.Model(&domain.Package{}).Where("status = ?", domain.StatusHandedOver).Count(&stats.HandedOver).Error
+	args4 := []interface{}{domain.StatusHandedOver}
+	startTime4 := time.Now()
+	err = pr.db.QueryRow(query2, domain.StatusHandedOver).Scan(&stats.HandedOver)
 	if err != nil {
+		database.LogQueryError(query2, args4, err, startTime4)
 		return nil, err
 	}
+	database.LogQuery(query2, args4, startTime4)
 
-	err = pr.db.Model(&domain.Package{}).Where("status = ?", domain.StatusExpired).Count(&stats.Expired).Error
+	args5 := []interface{}{domain.StatusExpired}
+	startTime5 := time.Now()
+	err = pr.db.QueryRow(query2, domain.StatusExpired).Scan(&stats.Expired)
 	if err != nil {
+		database.LogQueryError(query2, args5, err, startTime5)
 		return nil, err
 	}
+	database.LogQuery(query2, args5, startTime5)
 
 	return &stats, nil
 }
