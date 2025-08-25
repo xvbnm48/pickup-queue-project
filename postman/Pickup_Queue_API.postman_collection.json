@@ -1,0 +1,228 @@
+{
+    "info": {
+        "name": "Pickup Queue API",
+        "description": "Collection for testing Pickup Queue Management System API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8080/api/v1",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/health",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "health"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Create Package",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"order_ref\": \"ORD-20250824-001\",\n  \"driver_code\": \"DRV-JAKARTA-01\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/packages",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "List All Packages",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/packages?limit=10&offset=0",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages"
+                    ],
+                    "query": [
+                        {
+                            "key": "limit",
+                            "value": "10"
+                        },
+                        {
+                            "key": "offset",
+                            "value": "0"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "List Packages by Status",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/packages?status=WAITING",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages"
+                    ],
+                    "query": [
+                        {
+                            "key": "status",
+                            "value": "WAITING"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Get Package by ID",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/packages/{{packageId}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages",
+                        "{{packageId}}"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Get Package by Order Reference",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/packages/order/ORD-20250824-001",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages",
+                        "order",
+                        "ORD-20250824-001"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Update Package Status to PICKED_UP",
+            "request": {
+                "method": "PATCH",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"status\": \"PICKED_UP\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/packages/{{packageId}}/status",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages",
+                        "{{packageId}}",
+                        "status"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Update Package Status to HANDED_OVER",
+            "request": {
+                "method": "PATCH",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"status\": \"HANDED_OVER\"\n}"
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/packages/{{packageId}}/status",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages",
+                        "{{packageId}}",
+                        "status"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Delete Package",
+            "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/packages/{{packageId}}",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages",
+                        "{{packageId}}"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Get Package Statistics",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/packages/stats",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "packages",
+                        "stats"
+                    ]
+                }
+            }
+        }
+    ]
+}
