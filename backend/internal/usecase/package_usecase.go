@@ -25,6 +25,14 @@ func NewPackageUsecase(packageRepo domain.PackageRepository) *PackageUsecase {
 }
 
 func (pu *PackageUsecase) CreatePackage(req *domain.CreatePackageRequest) (*domain.Package, error) {
+	// Validate input
+	if req.OrderRef == "" {
+		return nil, errors.New("order reference is required")
+	}
+	if req.DriverCode == "" {
+		return nil, errors.New("driver code is required")
+	}
+
 	// Check if order reference already exists
 	existing, _ := pu.packageRepo.GetByOrderRef(req.OrderRef)
 	if existing != nil {

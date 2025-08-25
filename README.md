@@ -7,10 +7,12 @@ A full-stack application for managing package pickup queues with real-time statu
 The easiest way to run the entire application (API + Database + Frontend + Worker) is using Docker Compose:
 
 ### Prerequisites
+
 - Docker and Docker Compose installed
 - Make (optional, for shortcuts)
 
 ### Start All Services
+
 ```bash
 # Using Docker Compose directly
 docker compose up -d
@@ -20,12 +22,14 @@ make compose-up
 ```
 
 This will start:
-- 📊 **Frontend**: http://localhost:3000 (Next.js React app)
-- 🔌 **Backend API**: http://localhost:8080 (Go REST API)
+
+- 📊 **Frontend**: <http://localhost:3000> (Next.js React app)
+- 🔌 **Backend API**: <http://localhost:8080> (Go REST API)
 - 🗄️ **PostgreSQL Database**: localhost:5432
 - ⚙️ **Background Worker**: (Package expiry automation)
 
 ### Other Docker Compose Commands
+
 ```bash
 # Build all images
 make compose-build
